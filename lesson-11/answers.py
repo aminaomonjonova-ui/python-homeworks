@@ -61,6 +61,7 @@ print(cur.fetchall())
 conn.commit()
 conn.close()
 
+
 #task 2 
 import sqlite3
 
@@ -124,3 +125,4 @@ print(cur.fetchall())
 
 conn.commit()
 conn.close()
+
