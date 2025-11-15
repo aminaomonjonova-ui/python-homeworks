@@ -46,3 +46,4 @@ print("\n Рекомендация фильма:")
 print("Название:", movie['title'])
 print("Описание:", movie['overview'])
 print("Дата выхода:", movie['release_date'])
+git
