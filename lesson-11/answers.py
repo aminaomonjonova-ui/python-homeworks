@@ -1,12 +1,14 @@
 import sqlite3
 
-# -----------------------
-# 1. CREATE DATABASE
-# -----------------------
-conn = sqlite3.connect("roster.db")
-cursor = conn.cursor()
+# -------------------------
+# Task 1
+# -------------------------
 
-cursor.execute("""
+conn = sqlite3.connect("roster.db")
+cur = conn.cursor()
+
+# 1. Create table
+cur.execute("""
 CREATE TABLE IF NOT EXISTS Roster (
     Name TEXT,
     Species TEXT,
@@ -14,79 +16,63 @@ CREATE TABLE IF NOT EXISTS Roster (
 )
 """)
 
-# -----------------------
-# 2. INSERT DATA
-# -----------------------
+# 2. Insert data
 data = [
     ("Benjamin Sisko", "Human", 40),
     ("Jadzia Dax", "Trill", 300),
     ("Kira Nerys", "Bajoran", 29)
 ]
 
-cursor.executemany("INSERT INTO Roster VALUES (?, ?, ?)", data)
-conn.commit()
+cur.executemany("INSERT INTO Roster VALUES (?, ?, ?)", data)
 
-# -----------------------
-# 3. UPDATE DATA
-# Change Jadzia Dax → Ezri Dax
-# -----------------------
-cursor.execute("""
+# 3. Update Jadzia → Ezri
+cur.execute("""
 UPDATE Roster
 SET Name = 'Ezri Dax'
 WHERE Name = 'Jadzia Dax'
 """)
-conn.commit()
 
-# -----------------------
-# 4. QUERY DATA
-# Species = Bajoran
-# -----------------------
+# 4. Query Bajorans
 print("Bajoran characters:")
-cursor.execute("""
-SELECT Name, Age FROM Roster WHERE Species = 'Bajoran'
-""")
-rows = cursor.fetchall()
-for row in rows:
-    print(row)
+cur.execute("SELECT Name, Age FROM Roster WHERE Species = 'Bajoran'")
+print(cur.fetchall())
 
-# -----------------------
-# 5. DELETE CHARACTERS OVER 100 YEARS OLD
-# -----------------------
-cursor.execute("DELETE FROM Roster WHERE Age > 100")
+# 5. Delete characters over 100 years
+cur.execute("DELETE FROM Roster WHERE Age > 100")
+
+# 6. Add Rank column
+cur.execute("ALTER TABLE Roster ADD COLUMN Rank TEXT")
+
+# Fill Rank values
+ranks = [
+    ("Benjamin Sisko", "Captain"),
+    ("Ezri Dax", "Lieutenant"),
+    ("Kira Nerys", "Major")
+]
+
+for name, rank in ranks:
+    cur.execute("UPDATE Roster SET Rank = ? WHERE Name = ?", (rank, name))
+
+# 7. Query sorted by age desc
+print("\nCharacters sorted by age desc:")
+cur.execute("SELECT * FROM Roster ORDER BY Age DESC")
+print(cur.fetchall())
+
 conn.commit()
-
-# -----------------------
-# 6. BONUS — Add Rank column
-# -----------------------
-cursor.execute("ALTER TABLE Roster ADD COLUMN Rank TEXT")
-
-# Update ranks
-cursor.execute("UPDATE Roster SET Rank = 'Captain' WHERE Name = 'Benjamin Sisko'")
-cursor.execute("UPDATE Roster SET Rank = 'Lieutenant' WHERE Name = 'Ezri Dax'")
-cursor.execute("UPDATE Roster SET Rank = 'Major' WHERE Name = 'Kira Nerys'")
-conn.commit()
-
-# -----------------------
-# 7. ADVANCED QUERY — sort by Age DESC
-# -----------------------
-print("\nCharacters sorted by age (descending):")
-cursor.execute("SELECT * FROM Roster ORDER BY Age DESC")
-rows = cursor.fetchall()
-for row in rows:
-    print(row)
-
 conn.close()
 
-
+#task 2 
 import sqlite3
 
-# -----------------------
-# 1. CREATE DATABASE
-# -----------------------
-conn = sqlite3.connect("library.db")
-cursor = conn.cursor()
+# -------------------------
+# Task 2
+# -------------------------
 
-cursor.execute("""
+conn = sqlite3.connect("library.db")
+cur = conn.cursor()
+
+# 1. Create table
+cur.execute("""
 CREATE TABLE IF NOT EXISTS Books (
     Title TEXT,
     Author TEXT,
@@ -95,66 +81,46 @@ CREATE TABLE IF NOT EXISTS Books (
 )
 """)
 
-# -----------------------
-# 2. INSERT DATA
-# -----------------------
+# 2. Insert data
 books = [
     ("To Kill a Mockingbird", "Harper Lee", 1960, "Fiction"),
     ("1984", "George Orwell", 1949, "Dystopian"),
     ("The Great Gatsby", "F. Scott Fitzgerald", 1925, "Classic")
 ]
 
-cursor.executemany("INSERT INTO Books VALUES (?, ?, ?, ?)", books)
-conn.commit()
+cur.executemany("INSERT INTO Books VALUES (?, ?, ?, ?)", books)
 
-# -----------------------
-# 3. UPDATE YEAR
-# Update 1984 → 1950
-# -----------------------
-cursor.execute("""
+# 3. Update 1984
+cur.execute("""
 UPDATE Books
 SET Year_Published = 1950
 WHERE Title = '1984'
 """)
-conn.commit()
 
-# -----------------------
-# 4. QUERY DATA
-# Genre = Dystopian
-# -----------------------
+# 4. Query Dystopian
 print("\nDystopian books:")
-cursor.execute("""
-SELECT Title, Author FROM Books WHERE Genre = 'Dystopian'
-""")
-rows = cursor.fetchall()
-for row in rows:
-    print(row)
+cur.execute("SELECT Title, Author FROM Books WHERE Genre = 'Dystopian'")
+print(cur.fetchall())
 
-# -----------------------
-# 5. DELETE books before 1950
-# -----------------------
-cursor.execute("DELETE FROM Books WHERE Year_Published < 1950")
+# 5. Delete books before 1950
+cur.execute("DELETE FROM Books WHERE Year_Published < 1950")
+
+# 6. Add Rating column
+cur.execute("ALTER TABLE Books ADD COLUMN Rating REAL")
+
+ratings = [
+    ("To Kill a Mockingbird", 4.8),
+    ("1984", 4.7),
+    ("The Great Gatsby", 4.5)
+]
+
+for title, rating in ratings:
+    cur.execute("UPDATE Books SET Rating = ? WHERE Title = ?", (rating, title))
+
+# 7. Query sorted by Year Published
+print("\nBooks sorted by year asc:")
+cur.execute("SELECT * FROM Books ORDER BY Year_Published ASC")
+print(cur.fetchall())
+
 conn.commit()
-
-# -----------------------
-# 6. BONUS — Add Rating column
-# -----------------------
-cursor.execute("ALTER TABLE Books ADD COLUMN Rating REAL")
-
-cursor.execute("UPDATE Books SET Rating = 4.8 WHERE Title = 'To Kill a Mockingbird'")
-cursor.execute("UPDATE Books SET Rating = 4.7 WHERE Title = '1984'")
-cursor.execute("UPDATE Books SET Rating = 4.5 WHERE Title = 'The Great Gatsby'")
-conn.commit()
-
-# -----------------------
-# 7. ADVANCED QUERY — sort by Year ascending
-# -----------------------
-print("\nBooks sorted by Year:")
-cursor.execute("SELECT * FROM Books ORDER BY Year_Published ASC")
-rows = cursor.fetchall()
-for row in rows:
-    print(row)
-
 conn.close()
-
-
