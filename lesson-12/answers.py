@@ -1,61 +1,52 @@
-# task 1 
+#task1
 from bs4 import BeautifulSoup
 
-# ---- 1. Load & Parse HTML ----
-with open("weather.html", "r", encoding="utf-8") as file:
-    soup = BeautifulSoup(file, "html.parser")
+# ---------- 1. PARSE HTML FILE ----------
+with open("weather.html", "r", encoding="utf-8") as f:
+    soup = BeautifulSoup(f, "html.parser")
 
 rows = soup.select("table tbody tr")
 
-weather_data = []
+weather = []
 
 for row in rows:
-    cols = row.find_all("td")
-    day = cols[0].text.strip()
-    temp = int(cols[1].text.replace("°C", "").strip())
-    condition = cols[2].text.strip()
+    day = row.find_all("td")[0].get_text(strip=True)
+    temp = int(row.find_all("td")[1].get_text(strip=True).replace("°C", ""))
+    condition = row.find_all("td")[2].get_text(strip=True)
 
-    weather_data.append({
-        "day": day,
-        "temp": temp,
-        "condition": condition
-    })
+    weather.append({"day": day, "temp": temp, "condition": condition})
 
-# ---- 2. Display Weather Data ----
-print("5-Day Weather Forecast:\n")
-for entry in weather_data:
+# ---------- 2. DISPLAY WEATHER DATA ----------
+print("=== 5-Day Weather Forecast ===")
+for entry in weather:
     print(f"{entry['day']}: {entry['temp']}°C, {entry['condition']}")
 
-# ---- 3. Highest Temperature ----
-max_temp = max(entry["temp"] for entry in weather_data)
-hottest_days = [entry["day"] for entry in weather_data if entry["temp"] == max_temp]
+# ---------- 3. FIND SPECIFIC DATA ----------
+max_temp = max(w["temp"] for w in weather)
+hottest_days = [w["day"] for w in weather if w["temp"] == max_temp]
 
-print("\nDay(s) with highest temperature:", hottest_days)
+sunny_days = [w["day"] for w in weather if w["condition"] == "Sunny"]
 
-# ---- Sunny Days ----
-sunny_days = [entry["day"] for entry in weather_data if entry["condition"] == "Sunny"]
+print("\nHottest day(s):", hottest_days)
 print("Sunny day(s):", sunny_days)
 
-# ---- 4. Average Temperature ----
-avg_temp = sum(entry["temp"] for entry in weather_data) / len(weather_data)
-print("\nAverage temperature:", round(avg_temp, 2), "°C")
+# ---------- 4. AVERAGE TEMPERATURE ----------
+average_temp = sum(w["temp"] for w in weather) / len(weather)
+print("\nAverage temperature:", round(average_temp, 2), "°C")
 
-
-# task 2 
+#task2
 import requests
 from bs4 import BeautifulSoup
 import sqlite3
 import pandas as pd
 
-URL = "https://realpython.github.io/fake-jobs/"
-
-# ---- Database Setup ----
+# ---------------- DATABASE SETUP ----------------
 conn = sqlite3.connect("jobs.db")
 cursor = conn.cursor()
 
 cursor.execute("""
 CREATE TABLE IF NOT EXISTS jobs (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    id INTEGER PRIMARY KEY,
     title TEXT,
     company TEXT,
     location TEXT,
@@ -66,47 +57,49 @@ CREATE TABLE IF NOT EXISTS jobs (
 """)
 conn.commit()
 
-# ---- Scrape Job Listings ----
-response = requests.get(URL)
-soup = BeautifulSoup(response.text, "html.parser")
 
-jobs = soup.find_all("div", class_="card-content")
+# ---------------- SCRAPING FUNCTION ----------------
+def scrape_jobs():
+    url = "https://realpython.github.io/fake-jobs/"
+    response = requests.get(url)
+    soup = BeautifulSoup(response.text, "html.parser")
 
-for job in jobs:
-    title = job.find("h2", class_="title").text.strip()
-    company = job.find("h3", class_="company").text.strip()
-    location = job.find("p", class_="location").text.strip()
-    description = job.find("div", class_="description").text.strip()
-    apply_link = job.find("a", text="Apply")["href"]
+    job_cards = soup.find_all("div", class_="card-content")
 
-    try:
-        # Try insert new job
-        cursor.execute("""
-        INSERT INTO jobs (title, company, location, description, apply_link)
-        VALUES (?, ?, ?, ?, ?)
-        """, (title, company, location, description, apply_link))
-    except sqlite3.IntegrityError:
-        # Job exists → check if content changed
-        cursor.execute("""
-        SELECT description, apply_link
-        FROM jobs
-        WHERE title=? AND company=? AND location=?
-        """, (title, company, location))
+    for card in job_cards:
+        title = card.find("h2", class_="title").text.strip()
+        company = card.find("h3", class_="company").text.strip()
+        location = card.find("p", class_="location").text.strip()
+        description = card.find("div", class_="description").text.strip()
+        apply_link = card.find("a", text="Apply")["href"]
 
-        old_desc, old_link = cursor.fetchone()
-
-        if old_desc != description or old_link != apply_link:
+        try:
             cursor.execute("""
-            UPDATE jobs
-            SET description=?, apply_link=?
+            INSERT INTO jobs (title, company, location, description, apply_link)
+            VALUES (?, ?, ?, ?, ?)
+            """, (title, company, location, description, apply_link))
+
+        except sqlite3.IntegrityError:
+            # Job exists — check for updates
+            cursor.execute("""
+            SELECT description, apply_link FROM jobs
             WHERE title=? AND company=? AND location=?
-            """, (description, apply_link, title, company, location))
+            """, (title, company, location))
 
-conn.commit()
+            old_desc, old_link = cursor.fetchone()
 
-print("Scraping & database update completed.")
+            if old_desc != description or old_link != apply_link:
+                cursor.execute("""
+                UPDATE jobs
+                SET description=?, apply_link=?
+                WHERE title=? AND company=? AND location=?
+                """, (description, apply_link, title, company, location))
 
-# ---- Filtering ----
+    conn.commit()
+    print("Job scraping and incremental update complete.")
+
+
+# ---------------- FILTERING FUNCTION ----------------
 def filter_jobs(location=None, company=None):
     query = "SELECT * FROM jobs WHERE 1=1"
     params = []
@@ -118,41 +111,49 @@ def filter_jobs(location=None, company=None):
         query += " AND company=?"
         params.append(company)
 
-    df = pd.read_sql_query(query, conn, params=params)
-    return df
+    return pd.read_sql_query(query, conn, params=params)
 
-# ---- Export to CSV ----
-def export_jobs_to_csv(filename, location=None, company=None):
+
+# ---------------- EXPORT FUNCTION ----------------
+def export_to_csv(filename, location=None, company=None):
     df = filter_jobs(location, company)
     df.to_csv(filename, index=False)
-    print("Exported to", filename)
+    print("Exported to:", filename)
+
+
+# Run the scraper
+scrape_jobs()
+
 
 #task 3
 import json
 import requests
 
-# Load laptops page 1
-resp1 = requests.post("https://api.demoblaze.com/bycat", json={"cat": "notebook"})
-page1 = resp1.json()["Items"]
+# ---------------- LOAD PAGE 1 ----------------
+page1 = requests.post(
+    "https://api.demoblaze.com/bycat",
+    json={"cat": "notebook"}
+).json()["Items"]
 
-# Load laptops page 2
-resp2 = requests.post("https://api.demoblaze.com/bycat", json={"cat": "notebook", "id": "9"})
-page2 = resp2.json()["Items"]
+# ---------------- LOAD PAGE 2 (Next button data) ----------------
+page2 = requests.post(
+    "https://api.demoblaze.com/bycat",
+    json={"cat": "notebook", "id": "9"}
+).json()["Items"]
 
-all_items = page1 + page2
+items = page1 + page2
 
 laptops = []
 
-for item in all_items:
+for item in items:
     laptops.append({
         "name": item["title"],
         "price": item["price"],
         "description": item["desc"]
     })
 
+# ---------------- SAVE TO JSON ----------------
 with open("laptops.json", "w", encoding="utf-8") as f:
     json.dump(laptops, f, indent=4)
 
-print("Saved laptops.json successfully!")
-
-#i hope i did it right 
+print("Saved laptops.json")
